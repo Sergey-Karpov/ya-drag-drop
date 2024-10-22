@@ -8,21 +8,23 @@ const cartLink = document.querySelector(".cart__link");
 const productsList = [];
 const cartArray = [];
 
+import { products } from "./products.js";
+
 // get products fc
-const fetchProducts = async () => {
-  try {
-    const response = await fetch("./products.json");
+// const fetchProducts = async () => {
+//   try {
+//     const response = await fetch("./products.json");
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+//     if (!response.ok) {
+//       throw new Error(`HTTP error! status: ${response.status}`);
+//     }
 
-    const products = await response.json();
-    return products;
-  } catch (error) {
-    console.error("Ошибка загрузки JSON:", error);
-  }
-};
+//     const products = await response.json();
+//     return products;
+//   } catch (error) {
+//     console.error("Ошибка загрузки JSON:", error);
+//   }
+// };
 
 class Product {
   constructor(id, name, image) {
@@ -157,7 +159,7 @@ const drop = (ev) => {
 
 // add listeners
 document.addEventListener("DOMContentLoaded", async () => {
-  const products = await fetchProducts();
+  // const products = await fetchProducts();
 
   await fillShelf(products, shelf);
 
