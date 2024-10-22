@@ -12,7 +12,12 @@ const cartArray = [];
 const fetchProducts = async () => {
   try {
     const response = await fetch("./products.json");
-    const products = await response.json(response);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const products = await response.json();
     return products;
   } catch (error) {
     console.error("Ошибка загрузки JSON:", error);
