@@ -11,7 +11,7 @@ const cartArray = [];
 // get products fc
 const fetchProducts = async () => {
   try {
-    const response = await fetch("/products.json");
+    const response = await fetch("./products.json");
     const products = await response.json(response);
     return products;
   } catch (error) {
