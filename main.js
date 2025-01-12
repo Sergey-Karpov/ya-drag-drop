@@ -1,292 +1,195 @@
-const products = [
-  {
-    id: "1",
-    name: "vine",
-    image: "./assets/images/products/product-1.png",
-  },
-  {
-    id: "2",
-    name: "milk",
-    image: "./assets/images/products/product-2.png",
-  },
-  {
-    id: "3",
-    name: "jam",
-    image: "./assets/images/products/product-3.png",
-  },
-  {
-    id: "4",
-    name: "cheese",
-    image: "./assets/images/products/product-4.png",
-  },
-  {
-    id: "5",
-    name: "bacon",
-    image: "./assets/images/products/product-5.png",
-  },
-  {
-    id: "6",
-    name: "chicken",
-    image: "./assets/images/products/product-6.png",
-  },
-  {
-    id: "7",
-    name: "chips",
-    image: "./assets/images/products/product-7.png",
-  },
-  {
-    id: "8",
-    name: "pineapple",
-    image: "./assets/images/products/product-8.png",
-  },
-  {
-    id: "9",
-    name: "bananas",
-    image: "./assets/images/products/product-9.png",
-  },
-  {
-    id: "10",
-    name: "apple",
-    image: "./assets/images/products/product-10.png",
-  },
-  {
-    id: "11",
-    name: "salad",
-    image: "./assets/images/products/product-11.png",
-  },
-];
+import productList from "./products.js";
 
-const isTouchDevice = () =>
-  "ontouchstart" in window || navigator.maxTouchPoints > 0;
-
-const shelf = document.querySelector(".product-list");
-const cart = document.querySelector(".cart__body");
-const cartList = document.querySelector(".cart-list");
+const shelf = document.querySelector(".product-shelf");
+const cartBody = document.querySelector(".cart__body");
+const cart = document.querySelector(".product-cart");
 const cartLink = document.querySelector(".cart__link");
-const productsList = [];
-const cartArray = [];
-
-// get products fc
-// const fetchProducts = async () => {
-//   try {
-//     const response = await fetch("./products.json");
-
-//     if (!response.ok) {
-//       throw new Error(`HTTP error! status: ${response.status}`);
-//     }
-
-//     const products = await response.json();
-//     return products;
-//   } catch (error) {
-//     console.error("Ошибка загрузки JSON:", error);
-//   }
-// };
+const isTouchScreen = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+let dragElId = null;
+let dragDirection = "";
 
 class Product {
   constructor(id, name, image) {
     this.id = id;
     this.name = name;
     this.image = image;
+    this.el = Product.createEl(this.image, this.id);
+    this.addEventListeners();
   }
 
-  render() {
-    const productEl = document.createElement("li");
-    productEl.draggable = true;
-    productEl.setAttribute("data-id", `${this.id}`);
-    productEl.classList.add("product-item");
-    const productImage = document.createElement("img");
-    productImage.setAttribute("src", `${this.image}`);
-    productImage.setAttribute("alt", `${this.name}`);
-    productEl.appendChild(productImage);
+  static createEl(image, id) {
+    const el = document.createElement("div");
+    el.classList.add("product-item");
+    el.setAttribute("data-id", `${id}`);
+    el.draggable = true;
+    const imageEl = document.createElement("img");
+    imageEl.src = image;
+    el.append(imageEl);
 
-    if (isTouchDevice()) {
-      productEl.addEventListener("touchstart", (ev) => {
-        handleTouchStart(ev, this.id);
+    return el;
+  }
+
+  addEventListeners() {
+    if (isTouchScreen) {
+      const dragCopy = new DragCopy(this.el);
+
+      this.el.addEventListener("touchstart", (event) => {
+        dragElId = this.id;
+
+        if (checkEventRect(event.touches[0], shelf)) {
+          dragDirection = "from shelf to cart";
+        } else if (checkEventRect(event.touches[0], cartBody)) {
+          dragDirection = "from cart to shelf";
+        }
+
+        dragCopy.createCopy(event);
+        this.el.classList.toggle("product-item--hidden");
+      });
+
+      this.el.addEventListener("touchmove", (event) => {
+        dragCopy.updatePosition(event);
+      });
+
+      this.el.addEventListener("touchend", (event) => {
+        if (checkEventRect(event.changedTouches[0], cartBody)) {
+          moveProduct(dragDirection);
+        } else if (checkEventRect(event.changedTouches[0], shelf)) {
+          moveProduct(dragDirection);
+        }
+
+        dragCopy.removeCopy();
+        this.el.classList.toggle("product-item--hidden");
+        dragElId = null;
       });
     } else {
-      productEl.addEventListener("dragstart", (ev) => {
-        const id = ev.currentTarget.getAttribute("data-id");
-        ev.dataTransfer.setData("id", id);
+      this.el.addEventListener("dragstart", (event) => {
+        event.dataTransfer.setData("text/plain", this.id);
+        this.el.classList.toggle("product-item--hidden");
+        dragElId = this.id;
+      });
+
+      this.el.addEventListener("dragend", () => {
+        this.el.classList.toggle("product-item--hidden");
+        dragElId = null;
       });
     }
-
-    return productEl;
-  }
-
-  static isProductElement(element) {
-    return (
-      element.classList.contains("product-item") &&
-      element.hasAttribute("data-id")
-    );
   }
 }
 
-// PC VERSION
-// first shelf render
-const fillShelf = async (productList, shelfEl) => {
-  productList.forEach((product) => {
-    const newProductItem = new Product(product.id, product.name, product.image);
-    productsList.push(newProductItem);
-    const productEl = newProductItem.render();
-    shelfEl.appendChild(productEl);
+class DragCopy {
+  constructor(element) {
+    this.element = element;
+    this.copy = null;
+    this.offsetX = 0;
+    this.offsetY = 0;
+  }
+
+  createCopy(touchEvent) {
+    this.copy = this.element.cloneNode(true);
+    const touch = touchEvent.touches[0];
+    this.offsetX = touch.clientX;
+    this.offsetY = touch.clientY;
+    this.copy.style.pointerEvents = "none";
+    this.copy.style.position = "absolute";
+    this.copy.style.transform = "translate(-50%, -50%)";
+    this.copy.style.left = `${this.offsetX}px`;
+    this.copy.style.top = `${this.offsetY}px`;
+    this.copy.style.opacity = "0.6";
+    document.body.append(this.copy);
+  }
+
+  updatePosition(touchEvent) {
+    if (this.copy) {
+      const touch = touchEvent.touches[0];
+      this.copy.style.left = `${touch.clientX}px`;
+      this.copy.style.top = `${touch.clientY}px`;
+    }
+  }
+
+  removeCopy() {
+    if (this.copy) {
+      document.body.removeChild(this.copy);
+      this.copy = null;
+    }
+  }
+}
+
+const fillShelf = (shelfEl, prodList) => {
+  prodList.forEach((element) => {
+    const prodEl = new Product(element.id, element.name, element.image).el;
+    shelfEl.append(prodEl);
   });
 };
 
-// main logic fcs
-const addToCart = (id) => {
-  const currentProduct = productsList.find((item) => item.id === id);
-  const currentIndex = cartArray.findIndex((item) => item.id === id);
-  if (currentProduct && currentIndex === -1) {
-    cartArray.push(currentProduct);
-    shelf
-      .querySelector(`[data-id="${id}"]`)
-      .classList.add("product-item--hidden");
+const initShelfCartLEventListeners = () => {
+  if (isTouchScreen) {
   } else {
-    return;
-  }
-};
+    cartBody.addEventListener("dragover", (event) => {
+      event.preventDefault();
+    });
 
-const removeFromCart = (id) => {
-  const currentIndex = cartArray.findIndex((item) => item.id === id);
-  if (currentIndex !== -1) {
-    cartArray.splice(currentIndex, 1);
-    shelf
-      .querySelector(`[data-id="${id}"]`)
-      .classList.remove("product-item--hidden");
-  }
-};
+    shelf.addEventListener("dragover", (event) => {
+      event.preventDefault();
+    });
 
-const renderCart = (cartArray, cartListEl) => {
-  cartListEl.textContent = "";
+    cartBody.addEventListener("dragleave", (event) => {});
 
-  if (cartArray.length > 0) {
-    cartArray.forEach((product) => {
-      const existingProduct = productsList.find(
-        (item) => item.id === product.id
-      );
-      if (existingProduct) {
-        const productEl = existingProduct.render();
-        cartListEl.appendChild(productEl);
-      }
+    cartBody.addEventListener("drop", (event) => {
+      event.preventDefault();
+      addElementToList(cart);
+      changeCartLinkState();
+    });
+
+    shelf.addEventListener("drop", (event) => {
+      event.preventDefault();
+      addElementToList(shelf);
+      changeCartLinkState();
     });
   }
+};
 
-  if (cartArray.length >= 3) {
+const addElementToList = (listEl) => {
+  const dragElement = document.querySelector(`[data-id="${dragElId}"]`);
+  listEl.append(dragElement);
+};
+
+const removeElementFromList = (listEl) => {
+  const dragElement = document.querySelector(`[data-id="${dragElId}"]`);
+  listEl.append(dragElement);
+};
+
+const checkEventRect = (event, element) => {
+  const rect = element.getBoundingClientRect();
+
+  return (
+    event.clientX >= rect.left &&
+    event.clientX <= rect.right &&
+    event.clientY >= rect.top &&
+    event.clientY <= rect.bottom
+  );
+};
+
+const moveProduct = (direction) => {
+  if (direction === "from shelf to cart") {
+    removeElementFromList(shelf);
+    addElementToList(cart);
+  } else if (direction === "from cart to shelf") {
+    removeElementFromList(cart);
+    addElementToList(shelf);
+  }
+
+  changeCartLinkState();
+};
+
+const changeCartLinkState = () => {
+  if (cart.querySelectorAll(".product-item").length >= 3) {
     cartLink.classList.add("cart__link--active");
   } else {
     cartLink.classList.remove("cart__link--active");
   }
-
-  cartLink.classList.add("cart__link--animated");
-  setTimeout(() => {
-    cartLink.classList.remove("cart__link--animated");
-  }, 400);
 };
 
-// drop fcs
-const allowDrop = (ev) => {
-  ev.preventDefault();
-};
-
-const drag = (ev) => {
-  ev.dataTransfer.setData("text", ev.target.id);
-};
-
-const drop = (ev) => {
-  ev.preventDefault();
-  const productId = ev.dataTransfer.getData("id");
-
-  if (ev.currentTarget === cart) {
-    addToCart(productId);
-    renderCart(cartArray, cartList);
-  } else if (
-    ev.currentTarget === shelf ||
-    Product.isProductElement(ev.currentTarget)
-  ) {
-    removeFromCart(productId);
-    renderCart(cartArray, cartList);
-  } else {
-    shelf
-      .querySelector(`[data-id="${productId}"]`)
-      .classList.remove("product-item--hidden");
-    return;
-  }
-};
-
-// add listeners
-document.addEventListener("DOMContentLoaded", async () => {
-  // const products = await fetchProducts();
-
-  await fillShelf(products, shelf);
-
-  shelf.addEventListener("dragover", (e) => {
-    allowDrop(e);
-  });
-  shelf.addEventListener("drop", (e) => {
-    drop(e, shelf, cartList);
-  });
-
-  cart.addEventListener("dragover", (e) => {
-    allowDrop(e);
-  });
-  cart.addEventListener("drop", (e) => {
-    drop(e, shelf, cartList);
-  });
+document.addEventListener("DOMContentLoaded", () => {
+  fillShelf(shelf, productList);
+  initShelfCartLEventListeners();
 });
-
-// MOBILE VERSION
-// grab imitation create copy fc
-const createTouchCopy = (el) => {
-  const copy = el.cloneNode(true);
-  copy.style.position = "absolute";
-  copy.style.pointerEvents = "none";
-  copy.style.opacity = "0.7";
-  copy.style.listStyle = "none";
-  copy.style.zIndex = 1000;
-  copy.style.transform = "translate(-50%, -50%)";
-  document.body.appendChild(copy);
-
-  return copy;
-};
-
-// move copy fc
-const moveTouchCopy = (e, copy) => {
-  const touch = e.touches[0];
-  const offsetX = touch.clientX;
-  const offsetY = touch.clientY;
-
-  copy.style.left = `${offsetX}px`;
-  copy.style.top = `${offsetY}px`;
-};
-
-// main touch fc
-const handleTouchStart = (e, id) => {
-  const copy = createTouchCopy(e.currentTarget);
-
-  const moveHandler = (moveEvent) => {
-    moveTouchCopy(moveEvent, copy);
-  };
-
-  const endHandler = (endEvent) => {
-    const touch = endEvent.changedTouches[0];
-    const targetElement = document.elementFromPoint(
-      touch.clientX,
-      touch.clientY
-    );
-
-    if (cart.contains(targetElement)) {
-      addToCart(id);
-      renderCart(cartArray, cartList);
-    } else if (shelf.contains(targetElement)) {
-      removeFromCart(id);
-      renderCart(cartArray, cartList);
-    }
-
-    document.removeEventListener("touchmove", moveHandler);
-    document.removeEventListener("touchend", endHandler);
-    copy.remove();
-  };
-
-  document.addEventListener("touchmove", moveHandler);
-  document.addEventListener("touchend", endHandler);
-};
