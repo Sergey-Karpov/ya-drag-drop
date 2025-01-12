@@ -328,6 +328,10 @@ h2 {
   height: 228px;
 }
 
+.cart.cart--animated::before {
+  animation: pulse 0.3s ease-in-out forwards;
+}
+
 .cart::before {
   content: "";
   position: absolute;
@@ -339,6 +343,7 @@ h2 {
   background-size: cover;
   z-index: 1;
   pointer-events: none;
+  transition: transform 0.2s ease-in-out;
 }
 
 .cart__body {
@@ -389,12 +394,12 @@ h2 {
 
 @keyframes pulse {
   0% {
-    transform: translateX(-50%) scale(1);
+    transform: scale(1);
   }
   50% {
-    transform: translateX(-50%) scale(1.1);
+    transform: scale(1.05);
   }
   100% {
-    transform: translateX(-50%) scale(1);
+    transform: scale(1);
   }
 }

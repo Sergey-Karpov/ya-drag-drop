@@ -2,10 +2,11 @@ import productList from "./products.js";
 
 const shelf = document.querySelector(".product-shelf");
 const cartBody = document.querySelector(".cart__body");
+const cartDisplay = document.querySelector(".cart");
 const cart = document.querySelector(".product-cart");
 const cartLink = document.querySelector(".cart__link");
 const isTouchScreen = "ontouchstart" in window || navigator.maxTouchPoints > 0;
-let dragElId = null;
+let currentDraggedId = null;
 let dragDirection = "";
 
 class Product {
@@ -30,11 +31,13 @@ class Product {
   }
 
   addEventListeners() {
-    if (isTouchScreen) {
-      const dragCopy = new DragCopy(this.el);
+    let draggedElementCopy = null;
 
-      this.el.addEventListener("touchstart", (event) => {
-        dragElId = this.id;
+    const startHandler = (event) => {
+      currentDraggedId = this.id;
+
+      if (isTouchScreen) {
+        draggedElementCopy = new DragCopy(this.el);
 
         if (checkEventRect(event.touches[0], shelf)) {
           dragDirection = "from shelf to cart";
@@ -42,37 +45,45 @@ class Product {
           dragDirection = "from cart to shelf";
         }
 
-        dragCopy.createCopy(event);
-        this.el.classList.toggle("product-item--hidden");
-      });
+        draggedElementCopy.createCopy(event);
+      } else {
+        event.dataTransfer.setData("text/plain", this.id);
+      }
+      this.el.classList.toggle("product-item--hidden");
+    };
 
-      this.el.addEventListener("touchmove", (event) => {
-        dragCopy.updatePosition(event);
-      });
+    const moveHandler = (event) => {
+      if (isTouchScreen && draggedElementCopy) {
+        draggedElementCopy.updatePosition(event);
+      }
+    };
 
-      this.el.addEventListener("touchend", (event) => {
+    const endHandler = () => {
+      if (isTouchScreen) {
         if (checkEventRect(event.changedTouches[0], cartBody)) {
           moveProduct(dragDirection);
         } else if (checkEventRect(event.changedTouches[0], shelf)) {
           moveProduct(dragDirection);
         }
 
-        dragCopy.removeCopy();
-        this.el.classList.toggle("product-item--hidden");
-        dragElId = null;
-      });
-    } else {
-      this.el.addEventListener("dragstart", (event) => {
-        event.dataTransfer.setData("text/plain", this.id);
-        this.el.classList.toggle("product-item--hidden");
-        dragElId = this.id;
-      });
+        draggedElementCopy.removeCopy();
+      }
 
-      this.el.addEventListener("dragend", () => {
-        this.el.classList.toggle("product-item--hidden");
-        dragElId = null;
-      });
+      this.el.classList.toggle("product-item--hidden");
+      currentDraggedId = null;
+    };
+
+    this.el.addEventListener(
+      isTouchScreen ? "touchstart" : "dragstart",
+      startHandler
+    );
+    if (isTouchScreen) {
+      this.el.addEventListener("touchmove", moveHandler);
     }
+    this.el.addEventListener(
+      isTouchScreen ? "touchend" : "dragend",
+      endHandler
+    );
   }
 }
 
@@ -121,7 +132,7 @@ const fillShelf = (shelfEl, prodList) => {
   });
 };
 
-const initShelfCartLEventListeners = () => {
+const initializeEventListenersForShelfAndCart = () => {
   if (isTouchScreen) {
   } else {
     cartBody.addEventListener("dragover", (event) => {
@@ -131,8 +142,6 @@ const initShelfCartLEventListeners = () => {
     shelf.addEventListener("dragover", (event) => {
       event.preventDefault();
     });
-
-    cartBody.addEventListener("dragleave", (event) => {});
 
     cartBody.addEventListener("drop", (event) => {
       event.preventDefault();
@@ -149,13 +158,12 @@ const initShelfCartLEventListeners = () => {
 };
 
 const addElementToList = (listEl) => {
-  const dragElement = document.querySelector(`[data-id="${dragElId}"]`);
+  const dragElement = document.querySelector(`[data-id="${currentDraggedId}"]`);
   listEl.append(dragElement);
-};
 
-const removeElementFromList = (listEl) => {
-  const dragElement = document.querySelector(`[data-id="${dragElId}"]`);
-  listEl.append(dragElement);
+  if (listEl === cart) {
+    animateCart();
+  }
 };
 
 const checkEventRect = (event, element) => {
@@ -171,14 +179,22 @@ const checkEventRect = (event, element) => {
 
 const moveProduct = (direction) => {
   if (direction === "from shelf to cart") {
-    removeElementFromList(shelf);
     addElementToList(cart);
   } else if (direction === "from cart to shelf") {
-    removeElementFromList(cart);
     addElementToList(shelf);
   }
 
   changeCartLinkState();
+};
+
+const animateCart = () => {
+  cartDisplay.classList.add("cart--animated");
+
+  if (cartDisplay.classList.contains("cart--animated")) {
+    setTimeout(() => {
+      cartDisplay.classList.remove("cart--animated");
+    }, 300);
+  }
 };
 
 const changeCartLinkState = () => {
@@ -191,5 +207,5 @@ const changeCartLinkState = () => {
 
 document.addEventListener("DOMContentLoaded", () => {
   fillShelf(shelf, productList);
-  initShelfCartLEventListeners();
+  initializeEventListenersForShelfAndCart();
 });
